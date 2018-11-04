@@ -1,5 +1,5 @@
 const Checker = require('./lib/checker');
-//const Database = require('./lib/database');
+const Database = require('./lib/database');
 
 const currentTime = Date.now();
 const expireTimeInterval = (process.env['CertificateExpireTime']!=undefined ? (parseInt(process.env['CertificateExpireTime'])*1000):86400000);
