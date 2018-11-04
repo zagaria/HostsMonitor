@@ -1,0 +1,90 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Metadata:
+  License: Apache License 2.0
+Parameters:
+  CertificateInterval:
+    Type: Number
+    Default: 86400
+  Hosts:
+    Type: String
+    Default: it-explain.com;iotmeteo.com.ua
+Resources:
+  FunctionRole:
+    Type: AWS::IAM::Role
+    Version: "2012-10-17"
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - lambda.amazonaws.com
+          Action: sts:AssumeRole
+      Policies:
+      - PolicyName: Database
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+              - dynamodb:GetItem
+              - dynamodb:PutItem
+              - dynamodb:Query
+              - dynamodb:Scan
+              - dynamodb:UpdateItem
+              - dynamodb:DeleteItem
+              - dynamodb:DescribeTable
+            Resource: !GetAtt Database.Arn
+      - PolicyName: Logs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Effect: Allow
+            Action:
+            - logs:*
+            Resource: arn:aws:logs:*:*:*
+  Function:
+    Type: AWS::Lambda::Function
+    Properties:
+      Handler: "index.handler"
+      Role: !GetAtt FunctionRole.Arn
+      Runtime: "nodejs8.10"
+      Code:
+        S3Bucket: s3bucket
+        S3Key: path
+      Environment:
+        Variables:
+          HOSTS: !Ref Hosts
+          CertificateExpireTime: !Ref CertificateInterval
+          DynamoDBTable: !Ref Database
+  Database:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      AttributeDefinitions:
+        - AttributeName: host
+          AttributeType: S
+        - AttributeName: date
+          AttributeType: S
+      KeySchema:
+        - AttributeName: host
+          KeyType: HASH
+        - AttributeName: date
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+  Scheduler:
+    Type: AWS::Events::Rule
+    Properties:
+      ScheduleExpression: rate(1 minute)
+      State: ENABLED
+      Targets:
+        - Arn: !GetAtt Function.Arn
+          Id: FunctionScheduler
+  SchedulerPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName: !Ref Function
+      Action: lambda:InvokeFunction
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt Scheduler.Arn
