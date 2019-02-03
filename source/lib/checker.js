@@ -80,6 +80,7 @@ module.exports = class Checker {
 		
 		return new Promise((resolve,reject) => {
 			let time = Date.now();
+			let isChecked = false;
 			let req = https.request(options,(result) => {
 				
 				let errorsCodes = [];
@@ -116,9 +117,29 @@ module.exports = class Checker {
 				
 				cert.message = message;
 				cert.code = this.__ArraySum(errorsCodes);
-				
+				isChecked = true;
 				resolve(cert);
 			});
+			
+			req.setTimeout(5000);
+
+			req.on('timeout', () => { req.destroy();  
+			    if (isChecked==false) {
+				cert.code=-2;
+				alreadyCheck = true;
+			        resolve(cert)};
+			     }
+			);
+
+			req.on('error', (result) => {
+
+				console.log(cert);
+				if (isChecked==false){
+				    cert.message = result.code;
+				    cert.code = -1;
+				    isChecked = true;
+				    resolve(cert)};
+			 });
 			
 			req.on('error',(result)=>{
 				cert.message = result.code;
